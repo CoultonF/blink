@@ -1,0 +1,96 @@
+name: 4. Build Blink
+
+on:
+  workflow_dispatch:
+
+env:
+  BUNDLE_ID: sh.blink.blinkshell
+
+jobs:
+  build:
+    name: Build & Upload to TestFlight
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Select Xcode
+        run: sudo xcode-select -s '/Applications/Xcode_16.2.app/Contents/Developer'
+
+      - name: Cache frameworks
+        id: cache-frameworks
+        uses: actions/cache@v4
+        with:
+          path: |
+            xcfs/.build
+            Frameworks/ios_system/xcfs/.build
+          key: ${{ runner.os }}-frameworks-${{ hashFiles('get_frameworks.sh', 'xcfs/Package.swift') }}
+
+      - name: Download frameworks
+        if: steps.cache-frameworks.outputs.cache-hit != 'true'
+        run: ./get_frameworks.sh
+
+      - name: Download resources
+        run: ./get_resources.sh
+
+      - name: Setup developer config
+        env:
+          TEAMID: ${{ secrets.TEAMID }}
+        run: |
+          cat > developer_setup.xcconfig << EOF
+          TEAM_ID = ${TEAMID}
+          BUNDLE_ID = sh.blink.blinkshell
+          GROUP_ID = sh.blink
+          CLOUD_ID = sh.blink.blinkshell
+          KEYCHAIN_ID1 = sh.blink
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS[config=Debug] = BLINK_PUBLISHING_OPTION_DEVELOPER
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS[config=Release] = BLINK_PUBLISHING_OPTION_TESTFLIGHT
+          BLINK_MIGRATION_SCHEME = blinkv15
+          WHATS_NEW_URL = https://blink.sh/whats-new
+          CONVERSION_OPPORTUNITY_URL = https://blink.sh/upgrade
+          BLINK_APP_FONT = JetBrains Mono
+          EOF
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+
+      - name: Sync time
+        run: sudo sntp -sS time.apple.com || true
+
+      - name: Build Blink
+        env:
+          TEAMID: ${{ secrets.TEAMID }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+          FASTLANE_KEY_ID: ${{ secrets.FASTLANE_KEY_ID }}
+          FASTLANE_ISSUER_ID: ${{ secrets.FASTLANE_ISSUER_ID }}
+          FASTLANE_KEY: ${{ secrets.FASTLANE_KEY }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+        run: bundle exec fastlane build_blink
+
+      - name: Upload to TestFlight
+        env:
+          TEAMID: ${{ secrets.TEAMID }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+          FASTLANE_KEY_ID: ${{ secrets.FASTLANE_KEY_ID }}
+          FASTLANE_ISSUER_ID: ${{ secrets.FASTLANE_ISSUER_ID }}
+          FASTLANE_KEY: ${{ secrets.FASTLANE_KEY }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+        run: bundle exec fastlane release
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build-artifacts
+          path: |
+            ./build/Blink.ipa
+            ~/Library/Logs/gym/*.log
+          retention-days: 7

@@ -1,0 +1,9 @@
+app_identifier("sh.blink.blinkshell")
+
+# Apple Developer Portal Team ID
+team_id(ENV["TEAMID"])
+
+# App Store Connect Team ID (usually same as team_id for individual accounts)
+itc_team_id(ENV["TEAMID"])
+
+# Docs: https://docs.fastlane.tools/advanced/#Appfile

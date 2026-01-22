@@ -1,0 +1,188 @@
+name: Build Blink
+
+on:
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      force_build:
+        description: 'Force build even without changes'
+        required: false
+        default: 'false'
+        type: boolean
+
+  # Scheduled: Every Sunday at 7:00 AM UTC
+  # Builds monthly (2nd Sunday) or when updates are available
+  schedule:
+    - cron: '0 7 * * 0'
+
+env:
+  UPSTREAM_REPO: blinksh/blink
+  BUNDLE_ID: sh.blink.blinkshell
+
+jobs:
+  # Job 1: Check for updates and sync fork
+  check_updates:
+    name: Check for Updates
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.check.outputs.should_build }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Check upstream for updates
+        id: check
+        run: |
+          git remote add upstream https://github.com/${{ env.UPSTREAM_REPO }}.git || true
+          git fetch upstream raw --quiet
+
+          LOCAL=$(git rev-parse HEAD)
+          UPSTREAM=$(git rev-parse upstream/raw)
+
+          # Check if it's the 2nd Sunday (day 8-14)
+          DAY=$(date +%d)
+          IS_SECOND_SUNDAY=$([[ $DAY -ge 8 && $DAY -le 14 ]] && echo "true" || echo "false")
+
+          if [[ "$LOCAL" != "$UPSTREAM" ]]; then
+            echo "Updates available from upstream"
+            echo "should_build=true" >> $GITHUB_OUTPUT
+          elif [[ "$IS_SECOND_SUNDAY" == "true" ]]; then
+            echo "Monthly build (2nd Sunday)"
+            echo "should_build=true" >> $GITHUB_OUTPUT
+          elif [[ "${{ inputs.force_build }}" == "true" ]]; then
+            echo "Force build requested"
+            echo "should_build=true" >> $GITHUB_OUTPUT
+          else
+            echo "No build needed"
+            echo "should_build=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Sync fork with upstream
+        if: steps.check.outputs.should_build == 'true'
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git merge upstream/raw --no-edit || echo "Already up to date or merge not needed"
+          git push origin main || echo "Push not needed"
+
+  # Job 2: Validate secrets
+  validate:
+    name: Validate Secrets
+    runs-on: macos-15
+    needs: check_updates
+    if: needs.check_updates.outputs.should_build == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+
+      - name: Validate secrets
+        env:
+          TEAMID: ${{ secrets.TEAMID }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+          FASTLANE_KEY_ID: ${{ secrets.FASTLANE_KEY_ID }}
+          FASTLANE_ISSUER_ID: ${{ secrets.FASTLANE_ISSUER_ID }}
+          FASTLANE_KEY: ${{ secrets.FASTLANE_KEY }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+        run: bundle exec fastlane validate_secrets
+
+  # Job 3: Build and upload to TestFlight
+  build:
+    name: Build & Release
+    runs-on: macos-15
+    needs: [check_updates, validate]
+    if: needs.check_updates.outputs.should_build == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Select Xcode
+        run: sudo xcode-select -s '/Applications/Xcode_16.2.app/Contents/Developer'
+
+      - name: Cache frameworks
+        id: cache-frameworks
+        uses: actions/cache@v4
+        with:
+          path: |
+            xcfs/.build
+            Frameworks/ios_system/xcfs/.build
+          key: ${{ runner.os }}-frameworks-${{ hashFiles('get_frameworks.sh', 'xcfs/Package.swift') }}
+
+      - name: Download frameworks
+        if: steps.cache-frameworks.outputs.cache-hit != 'true'
+        run: ./get_frameworks.sh
+
+      - name: Download resources
+        run: ./get_resources.sh
+
+      - name: Setup developer config
+        env:
+          TEAMID: ${{ secrets.TEAMID }}
+        run: |
+          cat > developer_setup.xcconfig << EOF
+          TEAM_ID = ${TEAMID}
+          BUNDLE_ID = sh.blink.blinkshell
+          GROUP_ID = sh.blink
+          CLOUD_ID = sh.blink.blinkshell
+          KEYCHAIN_ID1 = sh.blink
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS[config=Debug] = BLINK_PUBLISHING_OPTION_DEVELOPER
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS[config=Release] = BLINK_PUBLISHING_OPTION_TESTFLIGHT
+          BLINK_MIGRATION_SCHEME = blinkv15
+          WHATS_NEW_URL = https://blink.sh/whats-new
+          CONVERSION_OPPORTUNITY_URL = https://blink.sh/upgrade
+          BLINK_APP_FONT = JetBrains Mono
+          EOF
+
+      - name: Setup Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+
+      - name: Sync time
+        run: sudo sntp -sS time.apple.com || true
+
+      - name: Build Blink
+        env:
+          TEAMID: ${{ secrets.TEAMID }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+          FASTLANE_KEY_ID: ${{ secrets.FASTLANE_KEY_ID }}
+          FASTLANE_ISSUER_ID: ${{ secrets.FASTLANE_ISSUER_ID }}
+          FASTLANE_KEY: ${{ secrets.FASTLANE_KEY }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+        run: bundle exec fastlane build_blink
+
+      - name: Upload to TestFlight
+        env:
+          TEAMID: ${{ secrets.TEAMID }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+          FASTLANE_KEY_ID: ${{ secrets.FASTLANE_KEY_ID }}
+          FASTLANE_ISSUER_ID: ${{ secrets.FASTLANE_ISSUER_ID }}
+          FASTLANE_KEY: ${{ secrets.FASTLANE_KEY }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+        run: bundle exec fastlane release
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build-artifacts
+          path: |
+            ./build/Blink.ipa
+            ~/Library/Logs/gym/*.log
+          retention-days: 7

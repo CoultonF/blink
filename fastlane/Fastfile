@@ -1,0 +1,227 @@
+# Fastfile for Blink Shell - TestFlight Automation
+# Based on LoopWorkspace's CI/CD approach
+
+default_platform(:ios)
+
+TEAMID = ENV["TEAMID"]
+GH_PAT = ENV["GH_PAT"]
+GITHUB_REPOSITORY_OWNER = ENV["GITHUB_REPOSITORY_OWNER"] || "CoultonF"
+FASTLANE_KEY_ID = ENV["FASTLANE_KEY_ID"]
+FASTLANE_ISSUER_ID = ENV["FASTLANE_ISSUER_ID"]
+FASTLANE_KEY = ENV["FASTLANE_KEY"]
+MATCH_PASSWORD = ENV["MATCH_PASSWORD"]
+
+# Bundle identifiers
+BUNDLE_ID = "sh.blink.blinkshell"
+BUNDLE_ID_FILE_PROVIDER = "#{BUNDLE_ID}.BlinkFileProviderExtension"
+BUNDLE_ID_FILE_PROVIDER_UI = "#{BUNDLE_ID}.BlinkFileProviderExtensionUI"
+
+IDENTIFIERS = [
+  BUNDLE_ID,
+  BUNDLE_ID_FILE_PROVIDER,
+  BUNDLE_ID_FILE_PROVIDER_UI
+]
+
+platform :ios do
+  desc "Validate required secrets"
+  lane :validate_secrets do
+    if TEAMID.nil? || TEAMID.empty?
+      UI.user_error!("TEAMID secret is missing")
+    end
+    if GH_PAT.nil? || GH_PAT.empty?
+      UI.user_error!("GH_PAT secret is missing")
+    end
+    if FASTLANE_KEY_ID.nil? || FASTLANE_KEY_ID.empty?
+      UI.user_error!("FASTLANE_KEY_ID secret is missing")
+    end
+    if FASTLANE_ISSUER_ID.nil? || FASTLANE_ISSUER_ID.empty?
+      UI.user_error!("FASTLANE_ISSUER_ID secret is missing")
+    end
+    if FASTLANE_KEY.nil? || FASTLANE_KEY.empty?
+      UI.user_error!("FASTLANE_KEY secret is missing")
+    end
+    if MATCH_PASSWORD.nil? || MATCH_PASSWORD.empty?
+      UI.user_error!("MATCH_PASSWORD secret is missing")
+    end
+    UI.success("All secrets validated successfully!")
+  end
+
+  desc "Create App Store Connect API key"
+  lane :create_api_key do
+    app_store_connect_api_key(
+      key_id: FASTLANE_KEY_ID,
+      issuer_id: FASTLANE_ISSUER_ID,
+      key_content: FASTLANE_KEY,
+      duration: 1200,
+      in_house: false
+    )
+  end
+
+  desc "Create app identifiers on Apple Developer Portal"
+  lane :identifiers do
+    create_api_key
+
+    IDENTIFIERS.each do |identifier|
+      app_identifier = identifier
+      name = identifier.gsub("sh.blink.blinkshell", "Blink Shell").gsub(".", " ")
+
+      produce(
+        app_identifier: app_identifier,
+        app_name: name,
+        skip_itc: true,
+        team_id: TEAMID
+      )
+    end
+
+    # Enable capabilities for main app
+    app_id = Spaceship::ConnectAPI::BundleId.find(BUNDLE_ID)
+    if app_id
+      app_id.enable_capability("iCloud", settings: [
+        { key: "ICLOUD_VERSION", options: [{ key: "CLOUDKIT" }] }
+      ])
+      app_id.enable_capability("PUSH_NOTIFICATIONS")
+      app_id.enable_capability("APP_GROUPS")
+      app_id.enable_capability("KEYCHAIN_SHARING")
+    end
+
+    # Enable App Groups for extensions
+    [BUNDLE_ID_FILE_PROVIDER, BUNDLE_ID_FILE_PROVIDER_UI].each do |ext_id|
+      ext_app_id = Spaceship::ConnectAPI::BundleId.find(ext_id)
+      if ext_app_id
+        ext_app_id.enable_capability("APP_GROUPS")
+      end
+    end
+
+    UI.success("Identifiers created and configured!")
+  end
+
+  desc "Sync certificates and provisioning profiles"
+  lane :certs do
+    create_api_key
+
+    match(
+      type: "appstore",
+      app_identifier: IDENTIFIERS,
+      git_basic_authorization: Base64.strict_encode64("#{GITHUB_REPOSITORY_OWNER}:#{GH_PAT}"),
+      team_id: TEAMID,
+      readonly: false
+    )
+  end
+
+  desc "Sync certificates (readonly)"
+  lane :certs_readonly do
+    create_api_key
+
+    match(
+      type: "appstore",
+      app_identifier: IDENTIFIERS,
+      git_basic_authorization: Base64.strict_encode64("#{GITHUB_REPOSITORY_OWNER}:#{GH_PAT}"),
+      team_id: TEAMID,
+      readonly: true
+    )
+  end
+
+  desc "Build Blink Shell for App Store / TestFlight"
+  lane :build_blink do
+    create_api_key
+
+    # Fetch certificates and profiles
+    match(
+      type: "appstore",
+      app_identifier: IDENTIFIERS,
+      git_basic_authorization: Base64.strict_encode64("#{GITHUB_REPOSITORY_OWNER}:#{GH_PAT}"),
+      team_id: TEAMID,
+      readonly: true
+    )
+
+    # Get provisioning profile names
+    profile_main = ENV["sigh_#{BUNDLE_ID}_appstore_profile-name"]
+    profile_file_provider = ENV["sigh_#{BUNDLE_ID_FILE_PROVIDER}_appstore_profile-name"]
+    profile_file_provider_ui = ENV["sigh_#{BUNDLE_ID_FILE_PROVIDER_UI}_appstore_profile-name"]
+
+    # Update code signing settings
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      path: "Blink.xcodeproj",
+      team_id: TEAMID,
+      code_sign_identity: "iPhone Distribution",
+      targets: ["Blink"],
+      profile_name: profile_main,
+      bundle_identifier: BUNDLE_ID
+    )
+
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      path: "Blink.xcodeproj",
+      team_id: TEAMID,
+      code_sign_identity: "iPhone Distribution",
+      targets: ["BlinkFileProviderExtension"],
+      profile_name: profile_file_provider,
+      bundle_identifier: BUNDLE_ID_FILE_PROVIDER
+    )
+
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      path: "Blink.xcodeproj",
+      team_id: TEAMID,
+      code_sign_identity: "iPhone Distribution",
+      targets: ["BlinkFileProviderExtensionUI"],
+      profile_name: profile_file_provider_ui,
+      bundle_identifier: BUNDLE_ID_FILE_PROVIDER_UI
+    )
+
+    # Get the latest TestFlight build number and increment
+    latest_build = latest_testflight_build_number(
+      app_identifier: BUNDLE_ID,
+      team_id: TEAMID
+    )
+    new_build_number = latest_build + 1
+
+    increment_build_number(
+      xcodeproj: "Blink.xcodeproj",
+      build_number: new_build_number
+    )
+
+    # Build the app
+    gym(
+      scheme: "Blink",
+      project: "Blink.xcodeproj",
+      configuration: "Release",
+      export_method: "app-store",
+      export_options: {
+        provisioningProfiles: {
+          BUNDLE_ID => profile_main,
+          BUNDLE_ID_FILE_PROVIDER => profile_file_provider,
+          BUNDLE_ID_FILE_PROVIDER_UI => profile_file_provider_ui
+        }
+      },
+      output_name: "Blink.ipa",
+      output_directory: "./build"
+    )
+  end
+
+  desc "Upload to TestFlight"
+  lane :release do
+    create_api_key
+
+    upload_to_testflight(
+      ipa: "./build/Blink.ipa",
+      skip_waiting_for_build_processing: true,
+      skip_submission: true
+    )
+
+    UI.success("Build uploaded to TestFlight!")
+  end
+
+  desc "Nuke certificates and start fresh"
+  lane :nuke_certs do
+    create_api_key
+
+    match_nuke(
+      type: "appstore",
+      app_identifier: IDENTIFIERS,
+      git_basic_authorization: Base64.strict_encode64("#{GITHUB_REPOSITORY_OWNER}:#{GH_PAT}"),
+      team_id: TEAMID
+    )
+  end
+end
