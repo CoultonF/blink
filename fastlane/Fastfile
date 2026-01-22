@@ -199,6 +199,28 @@ platform :ios do
       bundle_identifier: BUNDLE_ID_FILE_PROVIDER_UI
     )
 
+    # Update signing for framework targets (they don't need profiles but need team ID)
+    framework_targets = [
+      "BlinkFileProvider",
+      "BlinkFiles",
+      "BlinkConfig",
+      "BlinkCode",
+      "BlinkSnippets",
+      "SSH",
+      "AppKitBridge",
+      "BlinkLogging"
+    ]
+
+    framework_targets.each do |target|
+      update_code_signing_settings(
+        use_automatic_signing: false,
+        path: "Blink.xcodeproj",
+        team_id: TEAMID,
+        code_sign_identity: "Apple Distribution",
+        targets: [target]
+      )
+    end
+
     # Get the latest TestFlight build number and increment
     latest_build = latest_testflight_build_number(
       app_identifier: BUNDLE_ID,
