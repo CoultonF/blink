@@ -139,12 +139,27 @@ platform :ios do
   lane :build_blink do
     create_api_key
 
+    # Setup CI keychain
+    keychain_name = "fastlane_keychain"
+    keychain_password = SecureRandom.base64(24)
+
+    create_keychain(
+      name: keychain_name,
+      password: keychain_password,
+      default_keychain: true,
+      unlock: true,
+      timeout: 3600,
+      lock_when_sleeps: false
+    )
+
     # Fetch certificates and profiles
     match(
       type: "appstore",
       app_identifier: IDENTIFIERS,
       git_basic_authorization: Base64.strict_encode64("#{GITHUB_REPOSITORY_OWNER}:#{GH_PAT}"),
       team_id: TEAMID,
+      keychain_name: keychain_name,
+      keychain_password: keychain_password,
       readonly: true
     )
 
