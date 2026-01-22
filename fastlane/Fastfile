@@ -83,13 +83,24 @@ platform :ios do
     UI.message("Configuring capabilities for main app...")
     app_id = Spaceship::ConnectAPI::BundleId.find(BUNDLE_ID)
     if app_id
-      begin
-        app_id.create_capability(Spaceship::ConnectAPI::BundleIdCapability::Type::ICLOUD)
-        app_id.create_capability(Spaceship::ConnectAPI::BundleIdCapability::Type::PUSH_NOTIFICATIONS)
-        app_id.create_capability(Spaceship::ConnectAPI::BundleIdCapability::Type::APP_GROUPS)
-        app_id.create_capability(Spaceship::ConnectAPI::BundleIdCapability::Type::KEYCHAIN_SHARING)
-      rescue => e
-        UI.message("Some capabilities may already exist: #{e.message}")
+      capabilities = [
+        Spaceship::ConnectAPI::BundleIdCapability::Type::ICLOUD,
+        Spaceship::ConnectAPI::BundleIdCapability::Type::PUSH_NOTIFICATIONS,
+        Spaceship::ConnectAPI::BundleIdCapability::Type::APP_GROUPS,
+        Spaceship::ConnectAPI::BundleIdCapability::Type::KEYCHAIN_SHARING,
+        Spaceship::ConnectAPI::BundleIdCapability::Type::ASSOCIATED_DOMAINS,
+        Spaceship::ConnectAPI::BundleIdCapability::Type::DATA_PROTECTION,
+        Spaceship::ConnectAPI::BundleIdCapability::Type::FONT_INSTALLATION,
+        Spaceship::ConnectAPI::BundleIdCapability::Type::ACCESS_WIFI_INFORMATION,
+        Spaceship::ConnectAPI::BundleIdCapability::Type::NETWORK_EXTENSIONS
+      ]
+      capabilities.each do |cap|
+        begin
+          app_id.create_capability(cap)
+          UI.message("Enabled capability: #{cap}")
+        rescue => e
+          UI.message("Capability #{cap} may already exist or not available: #{e.message}")
+        end
       end
     end
 
