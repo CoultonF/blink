@@ -61,34 +61,48 @@ platform :ios do
   lane :identifiers do
     create_api_key
 
+    # Use Spaceship ConnectAPI to create bundle IDs
     IDENTIFIERS.each do |identifier|
-      app_identifier = identifier
       name = identifier.gsub("sh.blink.blinkshell", "Blink Shell").gsub(".", " ")
 
-      produce(
-        app_identifier: app_identifier,
-        app_name: name,
-        skip_itc: true,
-        team_id: TEAMID
-      )
+      # Check if bundle ID already exists
+      existing = Spaceship::ConnectAPI::BundleId.find(identifier)
+      if existing
+        UI.message("Bundle ID #{identifier} already exists")
+      else
+        UI.message("Creating Bundle ID: #{identifier}")
+        Spaceship::ConnectAPI::BundleId.create(
+          name: name,
+          identifier: identifier,
+          platform: Spaceship::ConnectAPI::BundleIdPlatform::IOS
+        )
+      end
     end
 
     # Enable capabilities for main app
+    UI.message("Configuring capabilities for main app...")
     app_id = Spaceship::ConnectAPI::BundleId.find(BUNDLE_ID)
     if app_id
-      app_id.enable_capability("iCloud", settings: [
-        { key: "ICLOUD_VERSION", options: [{ key: "CLOUDKIT" }] }
-      ])
-      app_id.enable_capability("PUSH_NOTIFICATIONS")
-      app_id.enable_capability("APP_GROUPS")
-      app_id.enable_capability("KEYCHAIN_SHARING")
+      begin
+        app_id.create_capability(Spaceship::ConnectAPI::BundleIdCapability::Type::ICLOUD)
+        app_id.create_capability(Spaceship::ConnectAPI::BundleIdCapability::Type::PUSH_NOTIFICATIONS)
+        app_id.create_capability(Spaceship::ConnectAPI::BundleIdCapability::Type::APP_GROUPS)
+        app_id.create_capability(Spaceship::ConnectAPI::BundleIdCapability::Type::KEYCHAIN_SHARING)
+      rescue => e
+        UI.message("Some capabilities may already exist: #{e.message}")
+      end
     end
 
     # Enable App Groups for extensions
     [BUNDLE_ID_FILE_PROVIDER, BUNDLE_ID_FILE_PROVIDER_UI].each do |ext_id|
+      UI.message("Configuring capabilities for #{ext_id}...")
       ext_app_id = Spaceship::ConnectAPI::BundleId.find(ext_id)
       if ext_app_id
-        ext_app_id.enable_capability("APP_GROUPS")
+        begin
+          ext_app_id.create_capability(Spaceship::ConnectAPI::BundleIdCapability::Type::APP_GROUPS)
+        rescue => e
+          UI.message("Capability may already exist: #{e.message}")
+        end
       end
     end
 
