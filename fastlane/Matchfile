@@ -1,4 +1,5 @@
 GITHUB_REPOSITORY_OWNER = ENV["GITHUB_REPOSITORY_OWNER"] || "CoultonF"
+BUNDLE_ID = ENV["BUNDLE_ID"] || "com.coultonf.blinkshell"
 
 git_url("https://github.com/#{GITHUB_REPOSITORY_OWNER}/Match-Secrets.git")
 
@@ -7,9 +8,9 @@ storage_mode("git")
 type("appstore")
 
 app_identifier([
-  "sh.blink.blinkshell",
-  "sh.blink.blinkshell.BlinkFileProviderExtension",
-  "sh.blink.blinkshell.BlinkFileProviderExtensionUI"
+  BUNDLE_ID,
+  "#{BUNDLE_ID}.BlinkFileProviderExtension",
+  "#{BUNDLE_ID}.BlinkFileProviderExtensionUI"
 ])
 
 # Docs: https://docs.fastlane.tools/actions/match

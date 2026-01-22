@@ -11,8 +11,8 @@ FASTLANE_ISSUER_ID = ENV["FASTLANE_ISSUER_ID"]
 FASTLANE_KEY = ENV["FASTLANE_KEY"]
 MATCH_PASSWORD = ENV["MATCH_PASSWORD"]
 
-# Bundle identifiers
-BUNDLE_ID = "sh.blink.blinkshell"
+# Bundle identifiers - Using custom bundle ID since sh.blink.blinkshell is taken
+BUNDLE_ID = ENV["BUNDLE_ID"] || "com.coultonf.blinkshell"
 BUNDLE_ID_FILE_PROVIDER = "#{BUNDLE_ID}.BlinkFileProviderExtension"
 BUNDLE_ID_FILE_PROVIDER_UI = "#{BUNDLE_ID}.BlinkFileProviderExtensionUI"
 

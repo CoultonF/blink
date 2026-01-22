@@ -3,6 +3,9 @@ name: 3. Create Certificates
 on:
   workflow_dispatch:
 
+env:
+  BUNDLE_ID: com.coultonf.blinkshell
+
 jobs:
   certs:
     name: Create/Sync Certificates
@@ -26,4 +29,5 @@ jobs:
           FASTLANE_ISSUER_ID: ${{ secrets.FASTLANE_ISSUER_ID }}
           FASTLANE_KEY: ${{ secrets.FASTLANE_KEY }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          BUNDLE_ID: ${{ env.BUNDLE_ID }}
         run: bundle exec fastlane certs

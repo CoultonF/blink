@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
 env:
-  BUNDLE_ID: sh.blink.blinkshell
+  BUNDLE_ID: com.coultonf.blinkshell
 
 jobs:
   build:
@@ -42,10 +42,10 @@ jobs:
         run: |
           cat > developer_setup.xcconfig << EOF
           TEAM_ID = ${TEAMID}
-          BUNDLE_ID = sh.blink.blinkshell
-          GROUP_ID = sh.blink
-          CLOUD_ID = sh.blink.blinkshell
-          KEYCHAIN_ID1 = sh.blink
+          BUNDLE_ID = ${{ env.BUNDLE_ID }}
+          GROUP_ID = com.coultonf
+          CLOUD_ID = ${{ env.BUNDLE_ID }}
+          KEYCHAIN_ID1 = com.coultonf
           SWIFT_ACTIVE_COMPILATION_CONDITIONS[config=Debug] = BLINK_PUBLISHING_OPTION_DEVELOPER
           SWIFT_ACTIVE_COMPILATION_CONDITIONS[config=Release] = BLINK_PUBLISHING_OPTION_TESTFLIGHT
           BLINK_MIGRATION_SCHEME = blinkv15
@@ -72,6 +72,7 @@ jobs:
           FASTLANE_ISSUER_ID: ${{ secrets.FASTLANE_ISSUER_ID }}
           FASTLANE_KEY: ${{ secrets.FASTLANE_KEY }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          BUNDLE_ID: ${{ env.BUNDLE_ID }}
         run: bundle exec fastlane build_blink
 
       - name: Upload to TestFlight
@@ -83,6 +84,7 @@ jobs:
           FASTLANE_ISSUER_ID: ${{ secrets.FASTLANE_ISSUER_ID }}
           FASTLANE_KEY: ${{ secrets.FASTLANE_KEY }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          BUNDLE_ID: ${{ env.BUNDLE_ID }}
         run: bundle exec fastlane release
 
       - name: Upload build artifacts
