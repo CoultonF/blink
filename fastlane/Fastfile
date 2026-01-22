@@ -268,6 +268,7 @@ platform :ios do
 
     upload_to_testflight(
       ipa: "./build/Blink.ipa",
+      app_identifier: BUNDLE_ID,
       skip_waiting_for_build_processing: true,
       skip_submission: true
     )
