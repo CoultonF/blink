@@ -79,27 +79,27 @@ platform :ios do
       end
     end
 
-    # Enable capabilities for main app
+    # Enable capabilities for main app using capability type strings
     UI.message("Configuring capabilities for main app...")
     app_id = Spaceship::ConnectAPI::BundleId.find(BUNDLE_ID)
     if app_id
-      capabilities = [
-        Spaceship::ConnectAPI::BundleIdCapability::Type::ICLOUD,
-        Spaceship::ConnectAPI::BundleIdCapability::Type::PUSH_NOTIFICATIONS,
-        Spaceship::ConnectAPI::BundleIdCapability::Type::APP_GROUPS,
-        Spaceship::ConnectAPI::BundleIdCapability::Type::KEYCHAIN_SHARING,
-        Spaceship::ConnectAPI::BundleIdCapability::Type::ASSOCIATED_DOMAINS,
-        Spaceship::ConnectAPI::BundleIdCapability::Type::DATA_PROTECTION,
-        Spaceship::ConnectAPI::BundleIdCapability::Type::FONT_INSTALLATION,
-        Spaceship::ConnectAPI::BundleIdCapability::Type::ACCESS_WIFI_INFORMATION,
-        Spaceship::ConnectAPI::BundleIdCapability::Type::NETWORK_EXTENSIONS
+      # Using string types since constants may vary
+      capability_types = %w[
+        ICLOUD
+        PUSH_NOTIFICATIONS
+        APP_GROUPS
+        ASSOCIATED_DOMAINS
+        DATA_PROTECTION
+        FONTS
+        ACCESS_WIFI_INFORMATION
+        NETWORK_EXTENSIONS
       ]
-      capabilities.each do |cap|
+      capability_types.each do |cap_type|
         begin
-          app_id.create_capability(cap)
-          UI.message("Enabled capability: #{cap}")
+          app_id.create_capability(cap_type)
+          UI.message("Enabled capability: #{cap_type}")
         rescue => e
-          UI.message("Capability #{cap} may already exist or not available: #{e.message}")
+          UI.message("Capability #{cap_type} may already exist or not available: #{e.message}")
         end
       end
     end
