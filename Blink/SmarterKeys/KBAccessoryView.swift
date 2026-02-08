@@ -65,6 +65,11 @@ class KBAccessoryView: UIInputView {
     _heightContraint?.constant = h
     return CGSize(width: -1, height: h)
   }
+
+  override func safeAreaInsetsDidChange() {
+    super.safeAreaInsetsDidChange()
+    invalidateIntrinsicContentSize()
+  }
 }
 
 extension KBAccessoryView: UIInputViewAudioFeedback {

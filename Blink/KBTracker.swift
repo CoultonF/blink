@@ -241,6 +241,11 @@ class KBTracker: NSObject {
       DispatchQueue.main.async {
         input.reportLang()
       }
+      // Force layout refresh after third-party keyboard switch settles
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+        input.contentView()?.reloadInputViews()
+        input.kbView.setNeedsLayout()
+      }
     }
   }
   
