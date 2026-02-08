@@ -84,6 +84,7 @@ typedef NS_ENUM(NSInteger, BKSnippetDefaultLocation) {
 @property (nonatomic) BOOL notificationOnBellUnfocused;
 @property (nonatomic) BOOL hapticFeedbackOnBellOff;
 @property (nonatomic) BOOL oscNotifications;
+@property (nonatomic) BOOL inAppNotifications;
 @property (nonatomic) BOOL invertVerticalScroll;
 @property (nonatomic) BOOL compactQuickActions;
 @property (nonatomic) BOOL dontUseBlinkSnippetsIndex;
@@ -107,6 +108,8 @@ typedef NS_ENUM(NSInteger, BKSnippetDefaultLocation) {
 + (void)setNotificationOnBellUnfocused:(BOOL)state;
 + (void)setHapticFeedbackOnBellOff:(BOOL)state;
 + (void)setOscNotifications:(BOOL)state;
++ (void)setInAppNotifications:(BOOL)state;
++ (BOOL)isInAppNotificationsOn;
 + (void)setInvertedVerticalScroll:(BOOL) state;
 + (void)setCompactQuickActions:(BOOL)value;
 + (void)setDontUseBlinkSnippetsIndex: (BOOL)state;

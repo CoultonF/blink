@@ -95,6 +95,7 @@ NSString *const BKAppearanceChanged = @"BKAppearanceChanged";
   _notificationOnBellUnfocused = [coder decodeBoolForKey:@"notificationOnBellUnfocused"];
   _hapticFeedbackOnBellOff = [coder decodeBoolForKey:@"hapticFeedbackOnBellOff"];
   _oscNotifications = [coder decodeBoolForKey:@"oscNotifications"];
+  _inAppNotifications = [coder decodeBoolForKey:@"inAppNotifications"];
   _invertVerticalScroll = [coder decodeBoolForKey:@"invertVerticalScroll"];
   _compactQuickActions = [coder decodeBoolForKey:@"compactQuickActions"];
   
@@ -127,6 +128,7 @@ NSString *const BKAppearanceChanged = @"BKAppearanceChanged";
   [encoder encodeBool:_notificationOnBellUnfocused forKey:@"notificationOnBellUnfocused"];
   [encoder encodeBool:_hapticFeedbackOnBellOff forKey:@"hapticFeedbackOnBellOff"];
   [encoder encodeBool:_oscNotifications forKey:@"oscNotifications"];
+  [encoder encodeBool:_inAppNotifications forKey:@"inAppNotifications"];
   [encoder encodeBool:_invertVerticalScroll forKey:@"invertVerticalScroll"];
   [encoder encodeBool:_compactQuickActions forKey:@"compactQuickActions"];
   [encoder encodeBool:_dontUseBlinkSnippetsIndex forKey:@"dontUseBlinkSnippetsIndex"];
@@ -340,6 +342,10 @@ NSString *const BKAppearanceChanged = @"BKAppearanceChanged";
   defaults.oscNotifications = state;
 }
 
++ (void)setInAppNotifications:(BOOL)state {
+  defaults.inAppNotifications = state;
+}
+
 + (void)setDontUseBlinkSnippetsIndex: (BOOL)state {
   defaults.dontUseBlinkSnippetsIndex = state;
 }
@@ -440,6 +446,10 @@ NSString *const BKAppearanceChanged = @"BKAppearanceChanged";
 
 + (BOOL)isOscNotificationsOn {
   return defaults.oscNotifications;
+}
+
++ (BOOL)isInAppNotificationsOn {
+  return defaults.inAppNotifications;
 }
 
 + (BOOL)doInvertVerticalScroll {

@@ -142,6 +142,8 @@ class TermController: UIViewController {
   }()
   private var _bgColor: UIColor? = nil
   private var _fontSizeBeforeScaling: Int? = nil
+  private var _lastNonNotifyTitle: String? = nil
+  private weak var _currentToast: InAppNotificationToast? = nil
   
   @objc public var viewIsLoaded: Bool = false
   
@@ -341,17 +343,79 @@ extension TermController: TermDeviceDelegate {
    Enable/Disable standard OSC sequences & iTerm2 notifications
    */
   func viewDidReceiveBellRing() {
-    
-    if BLKDefaults.isPlaySoundOnBellOn() && _termView.isFocused() {
-      AudioServicesPlaySystemSound(1103);
+    if let (notifyTitle, notifyBody) = parseBlinkNotify(_termView.title ?? "") {
+      handleRichNotification(title: notifyTitle, body: notifyBody)
+      restoreTerminalTitle()
+
+      if BLKDefaults.isPlaySoundOnBellOn() {
+        AudioServicesPlaySystemSound(1103)
+      }
+      if UIDevice.current.userInterfaceIdiom == .phone && !BLKDefaults.hapticFeedbackOnBellOff() {
+        UINotificationFeedbackGenerator().notificationOccurred(.warning)
+      }
+      return
     }
-  
+
+    _lastNonNotifyTitle = _termView.title
+
+    if BLKDefaults.isPlaySoundOnBellOn() && _termView.isFocused() {
+      AudioServicesPlaySystemSound(1103)
+    }
+
     viewNotify(["title": "🔔 \(_termView.title ?? "")", "type": BKNotificationType.bell.rawValue])
-    
-    // Haptic feedback is only visible from iPhones
+
     if UIDevice.current.userInterfaceIdiom == .phone && !BLKDefaults.hapticFeedbackOnBellOff() {
       UINotificationFeedbackGenerator().notificationOccurred(.warning)
     }
+  }
+
+  private func parseBlinkNotify(_ titleString: String) -> (title: String, body: String)? {
+    let prefix = "blink-notify:"
+    guard titleString.hasPrefix(prefix) else { return nil }
+    let remainder = String(titleString.dropFirst(prefix.count))
+    if let colonIndex = remainder.firstIndex(of: ":") {
+      let title = String(remainder[remainder.startIndex..<colonIndex])
+      let body = String(remainder[remainder.index(after: colonIndex)...])
+      return (title, body)
+    }
+    return (remainder, "")
+  }
+
+  private func handleRichNotification(title: String, body: String) {
+    let content = UNMutableNotificationContent()
+    content.title = title
+    content.body = body
+    content.sound = .default
+    content.threadIdentifier = meta.key.uuidString
+    content.targetContentIdentifier = "blink://open-scene/\(view?.window?.windowScene?.session.persistentIdentifier ?? "")"
+
+    let req = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+    let center = UNUserNotificationCenter.current()
+    center.requestAuthorization(options: [.alert, .sound, .announcement]) { granted, _ in
+      if granted {
+        center.add(req, withCompletionHandler: nil)
+      }
+    }
+
+    if _termView.isFocused() && BLKDefaults.isInAppNotificationsOn() {
+      showInAppToast(title: title, body: body)
+    }
+  }
+
+  private func restoreTerminalTitle() {
+    let restoreTitle = (_lastNonNotifyTitle ?? "")
+      .replacingOccurrences(of: "\\", with: "\\\\")
+      .replacingOccurrences(of: "'", with: "\\'")
+      .replacingOccurrences(of: "\n", with: "\\n")
+    _termView.webView?.evaluateJavaScript("document.title = '\(restoreTitle)'", completionHandler: nil)
+  }
+
+  private func showInAppToast(title: String, body: String) {
+    _currentToast?.dismiss()
+
+    let toast = InAppNotificationToast(title: title, body: body)
+    _currentToast = toast
+    toast.show(in: self.view)
   }
   
   /**

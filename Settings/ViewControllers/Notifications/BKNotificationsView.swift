@@ -48,6 +48,10 @@ struct BKNotificationsView: View {
       Section(header: Text("OSC Sequences"), footer: NotifyNotificationsView()) {
         Toggle("'Notify' notifications", isOn: $notification.notifyNotifications)
       }
+
+      Section(header: Text("In-App Notifications"), footer: BlinkNotifyExamplesView()) {
+        Toggle("Show in-app alerts", isOn: $notification.inAppNotifications)
+      }
     }
     .listStyle(GroupedListStyle())
     .navigationBarTitle("Notifications")
@@ -128,7 +132,7 @@ class NotificationConfig: ObservableObject {
   
   @Published var notifyNotifications: Bool {
     didSet {
-      
+
       _askForNotificationPermissions(completion: { granted in
         if !granted {
           self.notifyNotifications = false
@@ -137,7 +141,13 @@ class NotificationConfig: ObservableObject {
       })
     }
   }
-  
+
+  @Published var inAppNotifications: Bool {
+    didSet {
+      BLKDefaults.setInAppNotifications(inAppNotifications)
+    }
+  }
+
   private func _askForNotificationPermissions(completion: @escaping(Bool) -> Void) {
     
     let center = UNUserNotificationCenter.current()
@@ -154,5 +164,50 @@ class NotificationConfig: ObservableObject {
     notificationOnBackgroundShell = BLKDefaults.isNotificationOnBellUnfocusedOn()
     useHapticFeedback = !BLKDefaults.hapticFeedbackOnBellOff()
     notifyNotifications = BLKDefaults.isOscNotificationsOn()
+    inAppNotifications = BLKDefaults.isInAppNotificationsOn()
+  }
+}
+
+fileprivate enum BKBlinkNotifyExamples: CaseIterable {
+  case richNotification
+  case claudeCodeHook
+
+  var description: LocalizedStringKey {
+    switch self {
+    case .richNotification: return "Rich notification with title & body"
+    case .claudeCodeHook: return "Claude Code stop hook"
+    }
+  }
+
+  var example: String {
+    switch self {
+    case .richNotification:
+      return "printf '\\033]0;blink-notify:Done:Task finished\\007' && printf '\\a'"
+    case .claudeCodeHook:
+      return "printf '\\033]0;blink-notify:Claude Code:Task completed\\007' && sleep 0.1 && printf '\\a'"
+    }
+  }
+}
+
+struct BlinkNotifyExamplesView: View {
+  var body: some View {
+    VStack(alignment: .leading) {
+      Text("The blink-notify protocol encodes notification data in the terminal title, which works over Mosh. Set the title to blink-notify:<title>:<body> then send a BEL character.\n\nExamples (tap to copy):")
+
+      ForEach(BKBlinkNotifyExamples.allCases, id: \.self) { example in
+        Button(action: {
+          UIPasteboard.general.string = example.example
+        }) {
+          VStack(alignment: .leading) {
+            Text(example.description).bold()
+            Text(example.example).font(.system(.caption, design: .monospaced))
+          }
+        }.buttonStyle(PlainButtonStyle())
+        .clipShape(Rectangle())
+        .padding(2)
+      }
+    }.onDisappear(perform: {
+      BLKDefaults.save()
+    })
   }
 }
