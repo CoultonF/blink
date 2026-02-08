@@ -561,7 +561,7 @@ struct winsize __winSizeFromJSON(NSDictionary *json) {
     [_browserView ready];
     [[NSNotificationCenter defaultCenter] postNotificationName:TermViewBrowserReadyNotificationKey object:self];
   } else if ([operation isEqualToString:@"ring-bell"]) {
-    [_device viewDidReceiveBellRing];
+    [_device viewDidReceiveBellRingWithTitle:data[@"title"]];
     
   }
 }

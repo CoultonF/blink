@@ -54,7 +54,7 @@ extern NSString * TermViewBrowserReadyNotificationKey;
 - (void)viewAPICall:(NSString *)api andJSONRequest:(NSString *)request;
 - (void)viewNotify:(NSDictionary *)data;
 - (void)viewSelectionChanged;
-- (void)viewDidReceiveBellRing;
+- (void)viewDidReceiveBellRingWithTitle:(NSString *)title;
 
 @end
 

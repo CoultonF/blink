@@ -25,10 +25,10 @@ hterm.notify = function(params) {
 hterm.Terminal.prototype.ringBell = function() {
   // Blink cursor on BEL character
   this.cursorNode_.style.backgroundColor = this.scrollPort_.getForegroundColor();
-    
+
   setTimeout(() => this.restyleCursor_(), 200);
-  
-  _postMessage('ring-bell', null);
+
+  _postMessage('ring-bell', {title: document.title});
 };
 
 hterm.Terminal.prototype.copyStringToClipboard = function(content) {

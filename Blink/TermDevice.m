@@ -428,8 +428,8 @@ static int __sizeOfIncompleteSequenceAtTheEnd(const char *buffer, size_t len) {
   [_delegate viewNotify:data];
 }
 
-- (void)viewDidReceiveBellRing {
-  [_delegate viewDidReceiveBellRing];
+- (void)viewDidReceiveBellRingWithTitle:(NSString *)title {
+  [_delegate viewDidReceiveBellRingWithTitle:title];
 }
 
 - (void)viewAPICall:(NSString *)api andJSONRequest:(NSString *)request {

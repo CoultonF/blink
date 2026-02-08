@@ -342,8 +342,10 @@ extension TermController: TermDeviceDelegate {
    
    Enable/Disable standard OSC sequences & iTerm2 notifications
    */
-  func viewDidReceiveBellRing() {
-    if let (notifyTitle, notifyBody) = parseBlinkNotify(_termView.title ?? "") {
+  func viewDidReceiveBellRing(withTitle title: String!) {
+    let currentTitle = title ?? _termView.title ?? ""
+
+    if let (notifyTitle, notifyBody) = parseBlinkNotify(currentTitle) {
       handleRichNotification(title: notifyTitle, body: notifyBody)
       restoreTerminalTitle()
 
@@ -356,13 +358,13 @@ extension TermController: TermDeviceDelegate {
       return
     }
 
-    _lastNonNotifyTitle = _termView.title
+    _lastNonNotifyTitle = currentTitle
 
     if BLKDefaults.isPlaySoundOnBellOn() && _termView.isFocused() {
       AudioServicesPlaySystemSound(1103)
     }
 
-    viewNotify(["title": "🔔 \(_termView.title ?? "")", "type": BKNotificationType.bell.rawValue])
+    viewNotify(["title": "🔔 \(currentTitle)", "type": BKNotificationType.bell.rawValue])
 
     if UIDevice.current.userInterfaceIdiom == .phone && !BLKDefaults.hapticFeedbackOnBellOff() {
       UINotificationFeedbackGenerator().notificationOccurred(.warning)
