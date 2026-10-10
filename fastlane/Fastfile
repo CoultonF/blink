@@ -89,7 +89,6 @@ platform :ios do
         PUSH_NOTIFICATIONS
         APP_GROUPS
         ASSOCIATED_DOMAINS
-        DATA_PROTECTION
         FONTS
         ACCESS_WIFI_INFORMATION
         NETWORK_EXTENSIONS
@@ -103,6 +102,8 @@ platform :ios do
         end
       end
     end
+
+    configure_data_protection
 
     # Enable App Groups for extensions
     [BUNDLE_ID_FILE_PROVIDER, BUNDLE_ID_FILE_PROVIDER_UI].each do |ext_id|
@@ -120,9 +121,42 @@ platform :ios do
     UI.success("Identifiers created and configured!")
   end
 
+  private_lane :configure_data_protection do
+    app_id = Spaceship::ConnectAPI::BundleId.find(BUNDLE_ID)
+    UI.user_error!("Bundle ID #{BUNDLE_ID} is missing") unless app_id
+
+    capability = app_id.get_capabilities.find { |item| item.capability_type == "DATA_PROTECTION" }
+    UI.message("Current Data Protection for #{BUNDLE_ID}: #{capability ? capability.settings.to_json : 'disabled'}")
+    settings = [{ key: "DATA_PROTECTION_PERMISSION_LEVEL", options: [{ key: "COMPLETE_PROTECTION" }] }]
+
+    if capability
+      # The JWT API updates the capability itself, unlike the web-session bundle ID API.
+      client = Spaceship::ConnectAPI::Provisioning::Client.new(token: Spaceship::ConnectAPI.token)
+      client.patch("v1/bundleIdCapabilities/#{capability.id}", {
+        data: {
+          type: "bundleIdCapabilities",
+          id: capability.id,
+          attributes: { settings: settings }
+        }
+      })
+    else
+      app_id.create_capability("DATA_PROTECTION", settings: settings)
+    end
+
+    capability = app_id.get_capabilities.find { |item| item.capability_type == "DATA_PROTECTION" }
+    UI.message("Configured Data Protection for #{BUNDLE_ID}: #{capability&.settings.to_json}")
+    complete = capability && capability.settings.any? do |setting|
+      setting["key"] == "DATA_PROTECTION_PERMISSION_LEVEL" && setting.fetch("options", []).any? do |option|
+        option["key"] == "COMPLETE_PROTECTION" && option["enabled"] != false
+      end
+    end
+    UI.user_error!("Complete Protection was not enabled for #{BUNDLE_ID}") unless complete
+  end
+
   desc "Sync certificates and provisioning profiles"
   lane :certs do |options|
     create_api_key
+    configure_data_protection
 
     match(
       type: "appstore",
@@ -133,6 +167,12 @@ platform :ios do
       renew_expired_certs: true,
       force: options[:force].to_s == "true"
     )
+
+    profile_path = ENV["sigh_#{BUNDLE_ID}_appstore_profile-path"]
+    profile = FastlaneCore::ProvisioningProfile.parse(profile_path)
+    protection = profile.fetch("Entitlements")["com.apple.developer.default-data-protection"]
+    UI.message("Main provisioning profile Data Protection: #{protection}")
+    UI.user_error!("Main profile must include NSFileProtectionComplete; rerun with force:true") unless protection == "NSFileProtectionComplete"
   end
 
   desc "Sync certificates (readonly)"
