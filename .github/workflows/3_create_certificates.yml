@@ -2,6 +2,12 @@ name: 3. Create Certificates
 
 on:
   workflow_dispatch:
+    inputs:
+      force_profiles:
+        description: 'Regenerate all app and extension provisioning profiles'
+        required: false
+        default: false
+        type: boolean
 
 env:
   BUNDLE_ID: com.coultonf.blinkshell
@@ -30,4 +36,4 @@ jobs:
           FASTLANE_KEY: ${{ secrets.FASTLANE_KEY }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           BUNDLE_ID: ${{ env.BUNDLE_ID }}
-        run: bundle exec fastlane certs
+        run: bundle exec fastlane certs force:${{ inputs.force_profiles }}

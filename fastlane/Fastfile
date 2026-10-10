@@ -121,7 +121,7 @@ platform :ios do
   end
 
   desc "Sync certificates and provisioning profiles"
-  lane :certs do
+  lane :certs do |options|
     create_api_key
 
     match(
@@ -129,7 +129,9 @@ platform :ios do
       app_identifier: IDENTIFIERS,
       git_basic_authorization: Base64.strict_encode64("#{GITHUB_REPOSITORY_OWNER}:#{GH_PAT}"),
       team_id: TEAMID,
-      readonly: false
+      readonly: false,
+      renew_expired_certs: true,
+      force: options[:force].to_s == "true"
     )
   end
 
